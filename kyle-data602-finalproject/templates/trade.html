@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='page.css') }}">
+<h1>Welcome to the Trading Desk</h1>
+<h2>What would you like to transact?</h2>
+  <form action="/confirmation" method="POST">
+    <select name="side">
+      <option value="buy">Buy</option>
+      <option value="sell">Sell</option>
+    </select>
+	<select name="symbol">
+		{% for symbol in symbols[1:] %}
+		<option value="{{ symbol }}" SELECTED>{{ symbol }}</option>"
+		{% endfor %}
+		<option value="{{ symbols[0] }}" SELECTED>{{ symbols[0] }}</option>
+	</select>
+    quantity <input type="number" min="1" name="quantity" value=1>
+    <input type="submit" class="btn btn-info" value="Submit">
+  </form>
+  <a href="/" class="btn btn-info" role="button">Main Menu</a>  
+{% endblock %}

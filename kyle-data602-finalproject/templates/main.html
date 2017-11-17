@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='page.css') }}">
+<h1>Welcome to Kyle's Trader Web App</h1>
+<h2>Please select one of the following actions:</h2>
+
+  <a href="/trade" class="btn btn-warning" role="button">Trading Desk</a>
+  <a href="/blotter" class="btn btn-info" role="button">View Blotter</a>
+  <a href="/pl" class="btn btn-info" role="button">View P/L</a>
+{% endblock %}

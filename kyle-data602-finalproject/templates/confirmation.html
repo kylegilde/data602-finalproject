@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='confirmation_analytics.css') }}">
+<h1>Confirm Transaction</h1>
+<h2>{{ confirm }}</h2>
+  <form action="/submitTrade" method="POST">
+    <select name="confirm">
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+	<input type="submit" class="btn btn-info" value="Submit">
+  </form>
+		<div class=page>
+	  <title>Analytics</title>
+		<h1>{{titles[0]}}</h1>
+		{{ tables[0]|safe }}
+		<img src="{{ charts[0] }}" alt="Chart1">
+		<h1>{{titles[1]}}</h1>
+		{{ tables[1]|safe }}
+		<img src="{{ charts[1] }}" alt="Chart1">
+	</div>
+{% endblock %}
+

@@ -1,0 +1,35 @@
+CUNY DATA 602 Advanced Programming Techniques
+Assignment #2
+Web Trader App
+
+
+The first 4 functions of this app create the main menu and 3 pages that you can navigate to from the main menu.
+show_main_page
+show_trade_screen
+show_blotter
+show_pl
+
+The next 2 functions create some analytics and charts on the comfirm transaction page and execute the transaction.
+confirmation
+execute_trade
+
+These 2 functions create the charts that are displayed on the confirm transaction page.
+chart_avgprice_90days
+chart_price_100trades
+
+These 3 retrieve and parse html data.
+get_last_100_trades
+get_90_day_history
+get_quote
+
+These next 3 retrieve information from the MongoDB.
+get_portfolio
+get_pl_row
+get_position
+
+The final 4 functions handle exceptions and provide hyperlinks to the other menu pages.
+invalid_input
+no_money_left
+no_units_to_sell
+retrieval_failure
+
