@@ -1,0 +1,9 @@
+bs4
+requests
+datetime
+c3pyo
+flask 
+pandas
+pymongo
+lxml
+html5lib

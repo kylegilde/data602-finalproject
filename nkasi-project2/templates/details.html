@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+ <head>
+  <title> Trader Web </title>
+ </head>
+ <body>
+  <div>The Trade Page</div>
+  <a href="tradeStock">Trade Stock</a>
+  <a href="showBlotter">Show Blotter</a>
+  <a href="showPL">Show P/L</a>
+  <a href="reset">Reset Data</a>
+  <br><br><br>
+  <div>Stock Details</div>
+  <br>
+  <form action="/concludeTrade" method="post">
+    Stock: <input type="text" name="stockChosen" value="{{resultStock}}" readonly></input><br>
+    Side: <select id="side" name="sideChosen">
+		<option value="buy">Buy</option>
+		<option value="sell">Sell</option>
+	</select>
+	Quantity: <input type="number" name="quantity" min="1">
+  <input type="submit" value="Trade Stock"></input>
+  
+  </form>
+</select>
+ </body>
+</html>

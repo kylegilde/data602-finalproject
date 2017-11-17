@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+ <head>
+  <title> Trader Web Index </title>
+  <link rel="stylesheet" href="./static/css/c3.min.css">
+  <script src="./static/js/c3.min.js"></script>
+  <script src="./static/js/d3.min.js"></script>
+ </head>
+ <body>
+  <div>Last Hundred Trades</div>
+  <a href="tradeStock">Trade Stock</a>
+  <a href="showBlotter">Show Blotter</a>
+  <a href="showPL">Show P/L</a>
+  <a href="reset">Reset Data</a>
+  <br><br><br>
+  <p>You decided to trade the stock {{resultStock | safe}}</p>
+  
+  
+  <form action="/tradeConfirm" method="post">
+	 <input type="text" name="stock" value="{{resultStock | safe}}" readonly></input><br>
+	 <input type="submit" value="Continue Trade"></input>
+  </form>
+  
+  <p>Stock details are as follows:</p>
+  
+  <H1>Stock Price: {{resultPrice}}</H1>
+  <H1>Stock metrics:</H1>
+  <ul>
+      <li>Range-High:  {{resultMax}}</li>
+      <li>Range-Low: {{resultMin}}</li>
+      <li>Price Average: {{resultMean}}</li>
+      <li>Price Standard Deviation: {{resultMean}}</li>
+  </ul>
+  <br><br>
+  <H1>Trades Over Last Three Months Price: </HI>
+  <div id='time_series_open_close'></div>
+    <script type="text/javascript">
+        c3.generate({{jsonChartClose100|safe}})
+        
+    </script>
+  <br><br>
+  
+  <H1>Last Hundred Trades of this stock: </HI>
+  <div id='time_series_price'></div>
+    <script type="text/javascript">
+        c3.generate({{jsonChartTrade100|safe}})
+    </script>
+  
+  <  
+  <p>Status of Analysis: {{status1}} and {{status2}}</p>
+  
+  
+ </body>
+</html>
