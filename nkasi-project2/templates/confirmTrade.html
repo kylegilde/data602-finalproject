@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+ <head>
+  <title> Trader Web Index </title>
+ </head>
+ <body>
+  <div>Confirm Trade Test 2</div>
+  <a href="tradeStock">Trade Stock</a>
+  <a href="showBlotter">Show Blotter</a>
+  <a href="showPL">Show P/L</a>
+  <a href="reset">Reset Data</a>
+  <br><br><br>
+  <p>You decided to {{resultSide | safe}} the stock {{resultStock | safe}}</p>
+  <p>You elected to {{resultSide | safe}} the quantity {{resultQty | safe}} at a rate of ${{resultPrice | safe}} per share</p>
+  <p> {{resultMessage}} </p>
+
+  
+ </body>
+</html>
