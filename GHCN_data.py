@@ -18,93 +18,116 @@ try:
 except:
     print("Couldn't connect to database.")
 else:
+    #Get NY Weather Station Metadata
     try:
-        raw_csv = pd.DataFrame(list(db.raw_csv.find()))
-        test = raw_csv['Station']
+        NY_stations = pd.DataFrame(list(db.dim_station.find()))
+        NY_stations = NY_stations.set_index('Station')
+    except KeyError:
+        print("Couldn't connect to DB. Getting the data from the source. This will take a few minutes.")
+        station_url = 'https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt'
+        stations_df = pd.read_fwf(station_url,
+                                  colspecs=[[0, 11], [12, 19], [21, 29], [31, 36], [37, 40], [41, 70], [72, 74],
+                                            [76, 78], [80, 84], ],
+                                  names=['Station', 'Latitude', 'Longitude', 'Elevation', 'State', 'Station Name',
+                                         'GSN FLAG', 'HCN/CRN FLAG', 'WMO ID'],
+                                  index_col=False)
+        # Remove & Add columns
+        NY_stations = stations_df[stations_df['State'] == 'NY'][
+            ['Station', 'Latitude', 'Longitude', 'Elevation', 'State', 'Station Name']]
+        NY_stations = NY_stations.set_index("Station")
+        NY_stations['Full Address'], NY_stations['City'], NY_stations['Zip Code'], NY_stations[
+            'County'] = np.nan, np.nan, np.nan, np.nan
+        # Reverse Geocode the latitude/longitude
+        remaining_stations = NY_stations[pd.isnull(NY_stations['Full Address'])]
+        print(len(remaining_stations))
+        for station in remaining_stations.index.tolist()[]:
+            try:
+                results = Geocoder.reverse_geocode(NY_stations.loc[station, 'Latitude'],
+                                                   NY_stations.loc[station, 'Longitude'])
+                NY_stations.loc[station, 'Full Address'] = str(results)
+                NY_stations.loc[station, 'City'] = results.city
+                NY_stations.loc[station, 'Zip Code'] = results.postal_code
+                NY_stations.loc[station, 'County'] = results.administrative_area_level_2
+            except:  # except (OVER_QUERY_LIMIT, ZERO_RESULTS)
+                print('missing')
+        # Insert into DB
+        NY_stations = NY_stations.reset_index()
+        db.dim_station.drop()
+        db.dim_station.insert_many(NY_stations.to_dict("records"))
+    #Get historical weather data
+    try:
+        raw_csvs = pd.DataFrame(list(db.raw_csvs.find()))
+        test = raw_csvs['Station']
     except:
         print("Couldn't connect to DB. Getting the data from the source. This will take a few minutes.")
         start = time.time()
         i = 0
-        
+        #Initialize variables
         n_years = 10
         current_year = dt.date.today().year
         i_year = current_year - n_years + 1
-        raw_csv = pd.DataFrame()
-        url = 'https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/by_year/%d.csv.gz'
+        raw_csvs = pd.DataFrame()
+        url = 'ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/daily/by_year/%d.csv.gz'
+        NY_station_list = NY_stations[["Station"]]
+        #url = 'https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/by_year/%d.csv.gz'
         while i_year <= current_year:
             url_instance = url % i_year
             csv_instance = pd.read_csv(url_instance, compression='gzip',
                                  names = ['Station', 'Date', 'Attribute', 'Value', 'x', 'y', 'z'],
                                  index_col = False)
             csv_instance = csv_instance[['Station', 'Date', 'Attribute', 'Value']]
-            csv_instance = csv_instance[csv_instance['Station'].str.contains('US1NY')]
-            raw_csv = csv_instance.append(raw_csv, ignore_index = True)
+            #Filter to only the NY stations
+            csv_instance = csv_instance.merge(NY_station_list)
+            #Append DF
+            raw_csvs = csv_instance.append(raw_csvs, ignore_index=True)
+            #Timing
             i_year += 1
             i += 1
-            end = time.time()
-            lapsed = end - start
+            lapsed = time.time() - start
             per_loop = lapsed / i
-            print(lapsed/60, per_loop/60)
-        lapsed = end - start
+            print(i, lapsed/60, per_loop/60)
+        lapsed = time.time() - start
         print(lapsed/60)
-        db.raw_csv.drop()
-        db.raw_csv.insert_many(raw_csv.to_dict("records"))
+
+        csv_instance['Attribute'].value_counts()
+        raw_csvs['Value'].value_counts()
+        np.sum(raw_csvs['Value'] == 9999)
+        #Munge & Tidy the data
+        raw_csvs['Date'] = pd.to_datetime(raw_csvs['Date'].astype(str), format='%Y%m%d')
+        raw_csvs = pd.pivot_table(raw_csvs, index=['Station', 'Date'], values='Value',
+                                      columns='Attribute')
+        weather_df = raw_csvs.merge(on = 'Station')
+
+        db.raw_csvs.drop()
+        db.raw_csvs.insert_many(raw_csvs.to_dict("records"))
+
+
+    min_visibilitv = np.min(weather_df["Visibility"])
+    max_visibilitv = np.max(weather_df["Visibility"])
+    weather_df['Extreme Visibility Index'] = 1 - (weather_df["Visibility"] - min_visibilitv) / max_visibilitv
+
+    raw_csvs['Attribute'].value_counts()
+    weather_df.columns
+    weather_df.shape
+    weather_df.index
+    csv_instance.head()
+    weather_df.tail()
 
 
 # Tidying
-tidy_weather["Average"] = tidy_weather["Average"].str.extract('(\d*\.?\d*)').astype(float)
+# tidy_weather["Average"] = tidy_weather["Average"].str.extract('(\d*\.?\d*)').astype(float)
 
-# Pivot Actuals & Averages
-weather_actuals = pd.pivot_table(tidy_weather, index=["Date", "Zip Code"], values='Actual', columns='Attributes')
-# weather_averages = pd.pivot_table(tidy_weather, values='Average', index=["Date", "Zip Code"], columns='Attributes')
-# weather_averages = weather_averages[['Precipitation', "Mean Temperature"]].dropna()
-# weather_averages = weather_averages.rename(columns={'Precipitation': 'Average Precipitation',
-#                                                     'Mean Temperature': 'Average Temperature'})
 
-raw_csv.columns
-raw_csv.shape
-raw_csv.index
-raw_csv.head()
-raw_csv.tail()
 
-try:
-    # db.weather_collection.drop()
-    NY_stations = pd.DataFrame(list(db.dim_station.find()))
-    NY_stations = NY_stations.set_index('Station')
-except KeyError:
-    print("Couldn't connect to DB. Getting the data from the source. This will take a few minutes.")
-    station_url = 'https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt'
-    stations_df = pd.read_fwf(station_url,
-                              colspecs= [[0,11], [12,19], [21,29], [31,36], [37,40], [41,70], [72,74], [76,78], [80,84], ],
-                              names = ['Station', 'Latitude', 'Longitude', 'Elevation', 'State', 'Station Name', 'GSN FLAG','HCN/CRN FLAG', 'WMO ID'],
-                              index_col = False)
-    NY_stations = stations_df[stations_df['State'] == 'NY'][['Station', 'Latitude', 'Longitude', 'Elevation', 'State', 'Station Name']]
-    NY_stations = NY_stations.set_index("Station")
-    NY_stations['Full Address'], NY_stations['City'], NY_stations['Zip Code'], NY_stations['County'] = np.nan, np.nan, np.nan, np.nan
-    # while len(remaining_stations) > 0:
-    # Reverse Geocode the latitude/longitude
-    remaining_stations = NY_stations[pd.isnull(NY_stations['Full Address'])]
-    print(len(remaining_stations))
-    for station in remaining_stations.index.tolist()[ :500]:
-        try:
-            results = Geocoder.reverse_geocode(NY_stations.loc[station, 'Latitude'], NY_stations.loc[station, 'Longitude'])
-            NY_stations.loc[station, 'Full Address'] = str(results)
-            NY_stations.loc[station, 'City'] = results.city
-            NY_stations.loc[station, 'Zip Code'] = results.postal_code
-            NY_stations.loc[station, 'County'] = results.administrative_area_level_2
-        except:
-            print('missing')
-    # except (OVER_QUERY_LIMIT, ZERO_RESULTS)
-    NY_stations = NY_stations.reset_index()
-    db.dim_station.drop()
-    db.dim_station.insert_many(NY_stations.to_dict("records"))
 
 NY_stations.columns
+NY_stations['Station'].value_counts()
 
 
 
 
 
+NY_stations.drop(['index', 'level_0'], axis=1, inplace = True)
 
 
 NY_stations.shape
@@ -114,7 +137,7 @@ NY_stations.tail()
 np.max(csv_df["Date"])
 
 db.weather_collection.insert_many(weather_df.to_dict("records"))
-
+len('USR0000MCYC')
 
 df['ids'].str.contains('ball', na = False)
 csv_df.rename
