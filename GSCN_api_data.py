@@ -10,6 +10,52 @@ import pandas as pd
 from pymongo import MongoClient
 import time
 from pygeocoder import Geocoder
+import requests as req
+
+
+
+#Date Range
+start_date = dt.date(1997, 1, 1).strftime('%Y-%m-%d')
+# end_date = dt.date.today() #dt.timedelta(days=3)  # dt.date(2014, 12, 31)#start_date +
+# date_list = pd.date_range(start_date, end_date)
+
+#Variables to get
+variables = ['PRCP', 'SNWD', 'TMAX', 'AWND']
+
+#Zip Codes to query
+zip_codes = NY_stations['Zip Code'].unique()
+#len(zip_codes)
+#header
+headers = {'token': 'OSsaciGRPogGjCrRixolTOLVWLoUpReF'}
+
+api_url = 'https://www.ncdc.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&datatypeid=%s&locationid=ZIP:%s&startdate=%s'
+
+raw_weather_data = pd.DataFrame()
+variable = 'AWND'
+zip_code = '10023'
+for zip_code in zip_codes:
+    for variable in varibles:
+        url_instance = api_url % (varible, zip_code, start_date)
+        response = req.get(url_instance, headers = headers)
+responseTMAX = responseTMAX.json()
+pd.DataFrame(responseTMIN['results'])
+all_csvs = csv_instance.append(all_csvs, ignore_index = True)
+
+
+
+# &enddate=2017-10-31&limit=500
+# replace 'myToken' with the actual token, below
+
+
+
+responseTMIN = req.get(urlTMIN, headers = headers)
+responseTMIN = responseTMIN.json()
+
+responseAWND = req.get(urlAWND, headers = headers)
+responseAWND = responseAWND.json()
+pd.read_json(type(responseTMIN))
+pd.io.json.json_normalize(responseTMIN)
+
 
 
 def reverse_geocode_weather_stations(NY_stations):
@@ -70,8 +116,8 @@ except Exception as e:
 else:
     #Get historical weather data
     try:
-        weather_df = pd.DataFrame(list(db.weather_df.find()))
-        test = weather_df['Zip Code']
+        all_csvs = pd.DataFrame(list(db.all_csvs.find()))
+        test = all_csvs['Station']
     except Exception as e:
         print(e)
         start = time.time()
