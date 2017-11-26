@@ -28,7 +28,7 @@ def reverse_geocode_weather_stations(NY_stations):
             except Exception as e:
                 print(e)
     NY_stations = NY_stations.reset_index()
-    NY_stations = NY_stations[['Station', 'Zip Code']]
+    NY_stations = NY_stations[['Station', 'Zip Code', 'Latitude', 'Longitude']]
     return NY_stations
 
 def get_station_metadata():
