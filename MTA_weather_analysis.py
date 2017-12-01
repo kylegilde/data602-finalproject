@@ -20,7 +20,7 @@ def get_ridership_data():
         ridership_data = pd.DataFrame(list(db.ridership_data.find()))
         ridership_data = ridership_data[['Date', 'Entries', 'Exits', 'Station', 'Zip Code', 'Zip Code - 3 Digits']]
     except Exception as e:
-        print(e)
+        print(e, ': Getting new data')
         ### Initialize or recreate this data set. Write to MongoDB instance ###
         ### Input code that creates this data set here ###
         ### Input code that creates this data set here ###
@@ -66,7 +66,7 @@ def get_weather_station_metadata(get_new_data = False):
         NY_weather_stations = pd.DataFrame(list(db.dim_station.find()))
         test = NY_weather_stations['Station ID']
     except Exception as e:
-        print('Getting new data:', e)
+        print(e, ': Getting new data')
         ### Initialize or recreate this data set. Write to MongoDB instance ###
         station_url = 'https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt'
         stations_df = pd.read_fwf(station_url,
@@ -101,7 +101,7 @@ def create_MTA_weather_df(get_new_data = False):
                                          '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
                                          'Mean # of Absolute STDs']]
     except Exception as e:
-        print('Getting new data:', e)
+        print(e, ': Getting new data')
 
         ridership_data = get_ridership_data()
         NY_weather_stations = get_weather_station_metadata()
@@ -150,23 +150,23 @@ def create_MTA_weather_df(get_new_data = False):
         weather_df = weather_df.rename(columns={'PRCP': 'Precipitation (tenths of mm)',
                                                 'TMAX': 'Max Temperature',
                                                 'SNWD': 'Snow Depth (mm)'})
-        # Calculate # of Standard Deviations
+        # Calculate Means by Calendar Day
         weather_df['Max Temperature Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Max Temperature'].transform('mean')
         weather_df['Precipitation Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Precipitation (tenths of mm)'].transform('mean')
         weather_df['Snow Depth Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform('mean')
-
+        # Calculate the STDs by Calendar Day
         weather_df['Max Temperature Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Max Temperature'].transform('std')
         weather_df['Precipitation Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Precipitation (tenths of mm)'].transform('std')
         weather_df['Snow Depth Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform('std')
-
+        # Normalize metrics by calculating the # of STDs
         weather_df['# Max Temp STDs'] = (weather_df['Max Temperature'] - weather_df['Max Temperature Calendar-Day Mean']) / weather_df['Max Temperature Calendar-Day STD']
         weather_df['# Precipitation STDs'] = (weather_df['Precipitation (tenths of mm)'] - weather_df['Precipitation Calendar-Day Mean']) / weather_df['Precipitation Calendar-Day STD']
         weather_df['# Snow Depth STDs'] = ((weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df['Snow Depth Calendar-Day STD']).fillna(0)
         weather_df['Mean # of Absolute STDs'] = abs(weather_df['# Max Temp STDs']) + abs(weather_df['# Precipitation STDs']) + abs(weather_df['# Snow Depth STDs'])
-
+        # Drop some of the columns
         final_weather_df = weather_df[['Zip Code - 3 Digits', 'Date', 'Year', 'Month', 'Day', 'Max Temperature', 'Precipitation (tenths of mm)',
                                  'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs', 'Mean # of Absolute STDs']]
-
+        #Merge ridership and weather data
         MTA_weather_df = ridership_data.merge(final_weather_df, on=['Zip Code - 3 Digits', 'Date'])
         MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
                                          'Max Temperature', 'Precipitation (tenths of mm)', 'Snow Depth (mm)',
@@ -184,9 +184,13 @@ try:
     client = MongoClient(atlas)
     db = client.MTA_weather
 except Exception as e:
-    print("Couldn't connect to database.", e)
+    print("Couldn't connect to database:", e)
 else:
     MTA_weather_df = create_MTA_weather_df()
     MTA_weather_df.info()
     MTA_weather_df.describe()
     MTA_weather_df.head()
+    MTA_weather_df.to_csv('MTA_weather_df.csv')
+    MTA_weather_df['Year'].value_counts()
+
+
