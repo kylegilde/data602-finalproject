@@ -18,7 +18,7 @@ def get_ridership_data():
     try:
         ### Attempt to load from MongoDB instance ###
         ridership_data = pd.DataFrame(list(db.ridership_data.find()))
-        test = ridership_data['Zip Code']
+        ridership_data = ridership_data[['Date', 'Entries', 'Exits', 'Station', 'Zip Code', 'Zip Code - 3 Digits']]
     except Exception as e:
         print(e)
         ### Initialize or recreate this data set. Write to MongoDB instance ###
@@ -32,6 +32,8 @@ def get_ridership_data():
         ridership_data['Zip Code'] = ridership_data['Zip Code'].astype(str)
         ridership_data['Zip Code'].replace('4064', '04064', inplace=True)
         ridership_data['Zip Code - 3 Digits'] = ridership_data['Zip Code'].str[:3]
+        # Remove bad data
+        ridership_data = ridership_data[(ridership_data['Entries'] < 100000) & (ridership_data['Exits'] < 100000)]
         try:
             db.ridership_data.drop()
             db.ridership_data.insert_many(ridership_data.to_dict("records"))
@@ -64,7 +66,7 @@ def get_weather_station_metadata(get_new_data = False):
         NY_weather_stations = pd.DataFrame(list(db.dim_station.find()))
         test = NY_weather_stations['Station ID']
     except Exception as e:
-        print(e)
+        print('Getting new data:', e)
         ### Initialize or recreate this data set. Write to MongoDB instance ###
         station_url = 'https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt'
         stations_df = pd.read_fwf(station_url,
@@ -94,9 +96,12 @@ def create_MTA_weather_df(get_new_data = False):
         if get_new_data:
             1 / 0
         MTA_weather_df = pd.DataFrame(list(db.MTA_weather_df.find()))
-        test = MTA_weather_df['Date']
+        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
+                                         'Max Temperature', 'Precipitation (tenths of mm)', 'Snow Depth (mm)',
+                                         '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+                                         'Mean # of Absolute STDs']]
     except Exception as e:
-        print(e)
+        print('Getting new data:', e)
 
         ridership_data = get_ridership_data()
         NY_weather_stations = get_weather_station_metadata()
@@ -156,7 +161,7 @@ def create_MTA_weather_df(get_new_data = False):
 
         weather_df['# Max Temp STDs'] = (weather_df['Max Temperature'] - weather_df['Max Temperature Calendar-Day Mean']) / weather_df['Max Temperature Calendar-Day STD']
         weather_df['# Precipitation STDs'] = (weather_df['Precipitation (tenths of mm)'] - weather_df['Precipitation Calendar-Day Mean']) / weather_df['Precipitation Calendar-Day STD']
-        weather_df['# Snow Depth STDs'] = (weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df['Snow Depth Calendar-Day STD']
+        weather_df['# Snow Depth STDs'] = ((weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df['Snow Depth Calendar-Day STD']).fillna(0)
         weather_df['Mean # of Absolute STDs'] = abs(weather_df['# Max Temp STDs']) + abs(weather_df['# Precipitation STDs']) + abs(weather_df['# Snow Depth STDs'])
 
         final_weather_df = weather_df[['Zip Code - 3 Digits', 'Date', 'Year', 'Month', 'Day', 'Max Temperature', 'Precipitation (tenths of mm)',
@@ -182,3 +187,6 @@ except Exception as e:
     print("Couldn't connect to database.", e)
 else:
     MTA_weather_df = create_MTA_weather_df()
+    MTA_weather_df.info()
+    MTA_weather_df.describe()
+    MTA_weather_df.head()
