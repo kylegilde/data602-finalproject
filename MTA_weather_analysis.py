@@ -13,10 +13,11 @@ from pygeocoder import Geocoder
 import requests as req
 import math
 
+
 def get_ridership_data():
-    ### Loads or creates the ridership data by day, station and zip code###
+    # Loads or creates the ridership data by day, station and zip code #
     try:
-        ### Attempt to load from MongoDB instance ###
+        #Attempt to load from MongoDB instance
         ridership_data = pd.DataFrame(list(db.ridership_data.find()))
         ridership_data = ridership_data[['Date', 'Entries', 'Exits', 'Station', 'Zip Code', 'Zip Code - 3 Digits']]
     except Exception as e:
@@ -27,7 +28,7 @@ def get_ridership_data():
         ### Input code that creates this data set here ###.
         ### Input code that creates this data set here ###
         ridership_data = pd.read_csv('Fixed.csv', index_col=False)
-        ridership_data.columns= ['Date', 'Station', 'Entries', 'Exits', 'Zip Code']
+        ridership_data.columns = ['Date', 'Station', 'Entries', 'Exits', 'Zip Code']
         ridership_data['Date'] = pd.to_datetime(ridership_data['Date'])
         ridership_data['Zip Code'] = ridership_data['Zip Code'].astype(str)
         ridership_data['Zip Code'].replace('4064', '04064', inplace=True)
@@ -41,6 +42,7 @@ def get_ridership_data():
             print(e)
     return ridership_data
 
+
 def reverse_geocode_zip_codes(NY_weather_stations):
     ### Gets Zip Code and City for the weather stations ###
     NY_weather_stations = NY_weather_stations.set_index('Station ID')
@@ -50,19 +52,20 @@ def reverse_geocode_zip_codes(NY_weather_stations):
             try:
                 results = Geocoder.reverse_geocode(NY_weather_stations.loc[station, 'Latitude'],
                                                    NY_weather_stations.loc[station, 'Longitude'])
-                #NY_weather_stations.loc[station, 'City'] = results.city
+                # NY_weather_stations.loc[station, 'City'] = results.city
                 NY_weather_stations.loc[station, 'Zip Code'] = results.postal_code
             except Exception as e:
                 print(e)
     NY_weather_stations = NY_weather_stations.reset_index()
     return NY_weather_stations
 
-def get_weather_station_metadata(get_new_data = False):
+
+def get_weather_station_metadata(get_new_data=False):
     ### Get NY Weather Station Metadata ###
     try:
         if get_new_data:
-            1 / 0
-        ### Attempt to load from MongoDB instance ###
+            a = 1 / 0
+        #Attempt to load from MongoDB instance
         NY_weather_stations = pd.DataFrame(list(db.dim_station.find()))
         test = NY_weather_stations['Station ID']
     except Exception as e:
@@ -75,7 +78,7 @@ def get_weather_station_metadata(get_new_data = False):
                                   names=['Station ID', 'Latitude', 'Longitude', 'Elevation', 'State', 'Station Name',
                                          'GSN FLAG', 'HCN/CRN FLAG', 'WMO ID'],
                                   index_col=False)
-        #Subset to NY State
+        # Subset to NY State
         NY_weather_stations = stations_df[stations_df['State'] == 'NY']
         # Remove & Add columns
         NY_weather_stations = NY_weather_stations[['Station ID', 'Latitude', 'Longitude']]
@@ -90,11 +93,12 @@ def get_weather_station_metadata(get_new_data = False):
             print(e)
     return NY_weather_stations
 
-def create_MTA_weather_df(get_new_data = False):
+
+def create_MTA_weather_df(get_new_data=False):
     ### Pulls weather data from API and combines with MTA ridership data ###
     try:
         if get_new_data:
-            1 / 0
+            a = 1 / 0
         MTA_weather_df = pd.DataFrame(list(db.MTA_weather_df.find()))
         MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
                                          'Max Temperature', 'Precipitation (tenths of mm)', 'Snow Depth (mm)',
@@ -105,17 +109,17 @@ def create_MTA_weather_df(get_new_data = False):
 
         ridership_data = get_ridership_data()
         NY_weather_stations = get_weather_station_metadata()
-        #Initialize some constants & API parameters
+        # Initialize some constants & API parameters
         n_years = 30
         api_limit_per_call = 1000
-        variables = ['PRCP', 'SNWD', 'TMAX'] #Variables to get
-        #Initialize API parameters
+        variables = ['PRCP', 'SNWD', 'TMAX']  # Variables to get
+        # Initialize API parameters
         unique_zip_codes = ridership_data['Zip Code - 3 Digits'].unique()
         needed_weather_stations = NY_weather_stations[NY_weather_stations['Zip Code - 3 Digits'].isin(unique_zip_codes)]
-        days_per_api_call = math.floor(api_limit_per_call / len(variables)) - 1 #max per call
-        time_periods = math.ceil(n_years * 365 / days_per_api_call)
-        start_date = dt.date.today() - dt.timedelta(days = n_years * 365)
-        end_date = min(start_date + dt.timedelta(days = days_per_api_call), dt.date.today() - dt.timedelta(days = 6))
+        days_per_api_call = math.floor(api_limit_per_call / len(variables)) - 1  # max per call
+        time_periods = int(math.ceil(n_years * 365 / days_per_api_call))
+        start_date = dt.date.today() - dt.timedelta(days=n_years * 365)
+        end_date = min(start_date + dt.timedelta(days=days_per_api_call), dt.date.today() - dt.timedelta(days=6))
         str_start_date, str_end_date = start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
         headers = {'token': 'ljMPWeEPzzUNldzSpRogHqqEgkTFeVYf'}
         api_url = 'https://www.ncdc.noaa.gov/cdo-web/api/v2/data?datasetid=GHCND&datatypeid=%s&datatypeid=%s&datatypeid=%s&stationid=GHCND:%s&startdate=%s&enddate=%s&limit=%d'
@@ -125,18 +129,20 @@ def create_MTA_weather_df(get_new_data = False):
         for time_period in range(time_periods):
             for idx in needed_weather_stations.index.tolist():
                 try:
-                    parameters = (*variables, needed_weather_stations.loc[idx, "Station ID"], str_start_date, str_end_date, api_limit_per_call)
+                    parameters = (
+                    *variables, needed_weather_stations.loc[idx, "Station ID"], str_start_date, str_end_date,
+                    api_limit_per_call)
                     api_call = api_url % parameters
                     get_response = req.get(api_call, headers=headers)
                     response_to_json = get_response.json()
                     df_instance = pd.DataFrame(response_to_json['results'])
                     df_instance['Zip Code - 3 Digits'] = needed_weather_stations.loc[idx, "Zip Code - 3 Digits"]
                 except Exception as e:
-                     print(e)
+                    print(e)
                 else:
-                    raw_weather = df_instance.append(raw_weather, ignore_index = True)
+                    raw_weather = df_instance.append(raw_weather, ignore_index=True)
             start_date = end_date + dt.timedelta(1)
-            end_date = min(start_date + dt.timedelta(days = days_per_api_call), dt.date.today() - dt.timedelta(days=6))
+            end_date = min(start_date + dt.timedelta(days=days_per_api_call), dt.date.today() - dt.timedelta(days=6))
             str_start_date, str_end_date = start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
         # Pivot and take the mean values
         raw_weather['Date'] = pd.to_datetime(raw_weather['date'])
@@ -151,26 +157,40 @@ def create_MTA_weather_df(get_new_data = False):
                                                 'TMAX': 'Max Temperature',
                                                 'SNWD': 'Snow Depth (mm)'})
         # Calculate Means by Calendar Day
-        weather_df['Max Temperature Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Max Temperature'].transform('mean')
-        weather_df['Precipitation Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Precipitation (tenths of mm)'].transform('mean')
-        weather_df['Snow Depth Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform('mean')
+        weather_df['Max Temperature Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])[
+            'Max Temperature'].transform('mean')
+        weather_df['Precipitation Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])[
+            'Precipitation (tenths of mm)'].transform('mean')
+        weather_df['Snow Depth Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform(
+            'mean')
         # Calculate the STDs by Calendar Day
-        weather_df['Max Temperature Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Max Temperature'].transform('std')
-        weather_df['Precipitation Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Precipitation (tenths of mm)'].transform('std')
-        weather_df['Snow Depth Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform('std')
+        weather_df['Max Temperature Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])[
+            'Max Temperature'].transform('std')
+        weather_df['Precipitation Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])[
+            'Precipitation (tenths of mm)'].transform('std')
+        weather_df['Snow Depth Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform(
+            'std')
         # Normalize metrics by calculating the # of STDs
-        weather_df['# Max Temp STDs'] = (weather_df['Max Temperature'] - weather_df['Max Temperature Calendar-Day Mean']) / weather_df['Max Temperature Calendar-Day STD']
-        weather_df['# Precipitation STDs'] = (weather_df['Precipitation (tenths of mm)'] - weather_df['Precipitation Calendar-Day Mean']) / weather_df['Precipitation Calendar-Day STD']
-        weather_df['# Snow Depth STDs'] = ((weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df['Snow Depth Calendar-Day STD']).fillna(0)
-        weather_df['Mean # of Absolute STDs'] = abs(weather_df['# Max Temp STDs']) + abs(weather_df['# Precipitation STDs']) + abs(weather_df['# Snow Depth STDs'])
+        weather_df['# Max Temp STDs'] = (weather_df['Max Temperature'] - weather_df[
+            'Max Temperature Calendar-Day Mean']) / weather_df['Max Temperature Calendar-Day STD']
+        weather_df['# Precipitation STDs'] = (weather_df['Precipitation (tenths of mm)'] - weather_df[
+            'Precipitation Calendar-Day Mean']) / weather_df['Precipitation Calendar-Day STD']
+        weather_df['# Snow Depth STDs'] = (
+        (weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df[
+            'Snow Depth Calendar-Day STD']).fillna(0)
+        weather_df['Mean # of Absolute STDs'] = abs(weather_df['# Max Temp STDs']) + abs(
+            weather_df['# Precipitation STDs']) + abs(weather_df['# Snow Depth STDs'])
         # Drop some of the columns
-        final_weather_df = weather_df[['Zip Code - 3 Digits', 'Date', 'Year', 'Month', 'Day', 'Max Temperature', 'Precipitation (tenths of mm)',
-                                 'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs', 'Mean # of Absolute STDs']]
-        #Merge ridership and weather data
+        final_weather_df = weather_df[
+            ['Zip Code - 3 Digits', 'Date', 'Year', 'Month', 'Day', 'Max Temperature', 'Precipitation (tenths of mm)',
+             'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+             'Mean # of Absolute STDs']]
+        # Merge ridership and weather data
         MTA_weather_df = ridership_data.merge(final_weather_df, on=['Zip Code - 3 Digits', 'Date'])
         MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
                                          'Max Temperature', 'Precipitation (tenths of mm)', 'Snow Depth (mm)',
-                                         '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs', 'Mean # of Absolute STDs']]
+                                         '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+                                         'Mean # of Absolute STDs']]
         # Insert into DB
         try:
             db.MTA_weather_df.drop()
@@ -178,6 +198,7 @@ def create_MTA_weather_df(get_new_data = False):
         except Exception as e:
             print(e)
     return MTA_weather_df
+
 
 try:
     atlas = "mongodb://kylegilde:kyle1234!@data602-shard-00-00-lfo48.mongodb.net:27017,data602-shard-00-01-lfo48.mongodb.net:27017,data602-shard-00-02-lfo48.mongodb.net:27017/admin?ssl=true&authSource=admin"
@@ -192,5 +213,3 @@ else:
     MTA_weather_df.head()
     MTA_weather_df.to_csv('MTA_weather_df.csv')
     MTA_weather_df['Year'].value_counts()
-
-
