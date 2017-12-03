@@ -85,6 +85,7 @@ def get_weather_station_metadata(get_new_data=False):
         NY_weather_stations['Zip Code'], NY_weather_stations['City'] = np.nan, np.nan
         # Gets zip code and city
         NY_weather_stations = reverse_geocode_zip_codes(NY_weather_stations)
+        NY_weather_stations['Zip Code - 3 Digits'] = NY_weather_stations['Zip Code'].str[:3]
         # Insert into DB
         try:
             db.dim_station.drop()
@@ -100,10 +101,7 @@ def create_MTA_weather_df(get_new_data=False):
         if get_new_data:
             a = 1 / 0
         MTA_weather_df = pd.DataFrame(list(db.MTA_weather_df.find()))
-        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
-                                         'Max Temperature', 'Precipitation (tenths of mm)', 'Snow Depth (mm)',
-                                         '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
-                                         'Mean # of Absolute STDs']]
+        test = MTA_weather_df['Date']
     except Exception as e:
         print(e, ': Getting new data')
 
@@ -136,7 +134,7 @@ def create_MTA_weather_df(get_new_data=False):
                     get_response = req.get(api_call, headers=headers)
                     response_to_json = get_response.json()
                     df_instance = pd.DataFrame(response_to_json['results'])
-                    df_instance['Zip Code - 3 Digits'] = needed_weather_stations.loc[idx, "Zip Code - 3 Digits"]
+                    df_instance['Zip Code - 3 Digits'] = needed_weather_stations.loc[idx, 'Zip Code - 3 Digits']
                 except Exception as e:
                     print(e)
                 else:
@@ -149,46 +147,45 @@ def create_MTA_weather_df(get_new_data=False):
         weather_df = pd.pivot_table(raw_weather, index=['Zip Code - 3 Digits', 'Date'], values='value',
                                     columns='datatype').dropna()
         weather_df = weather_df.reset_index()
-        # Add & rename columns
+        # Add, rename & transform columns
         weather_df['Day'], weather_df['Month'], weather_df['Year'] = weather_df['Date'].dt.day, \
                                                                      weather_df['Date'].dt.month, \
                                                                      weather_df['Date'].dt.year
-        weather_df = weather_df.rename(columns={'PRCP': 'Precipitation (tenths of mm)',
-                                                'TMAX': 'Max Temperature',
-                                                'SNWD': 'Snow Depth (mm)'})
+        # From tenths of degrees C to degrees C
+        weather_df['Max Temperature (C)'] = weather_df['TMAX'] / 10
+        # From tenths of mm to mm
+        weather_df['Precipitation (mm)'] = weather_df['PRCP'] / 10
+        weather_df = weather_df.rename(columns={'SNWD': 'Snow Depth (mm)'})
+
         # Calculate Means by Calendar Day
         weather_df['Max Temperature Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])[
-            'Max Temperature'].transform('mean')
+            'Max Temperature (C)'].transform('mean')
         weather_df['Precipitation Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])[
-            'Precipitation (tenths of mm)'].transform('mean')
+            'Precipitation (mm)'].transform('mean')
         weather_df['Snow Depth Calendar-Day Mean'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform(
             'mean')
         # Calculate the STDs by Calendar Day
         weather_df['Max Temperature Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])[
-            'Max Temperature'].transform('std')
+            'Max Temperature (C)'].transform('std')
         weather_df['Precipitation Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])[
-            'Precipitation (tenths of mm)'].transform('std')
+            'Precipitation (mm)'].transform('std')
         weather_df['Snow Depth Calendar-Day STD'] = weather_df.groupby(['Month', 'Day'])['Snow Depth (mm)'].transform(
             'std')
         # Normalize metrics by calculating the # of STDs
-        weather_df['# Max Temp STDs'] = (weather_df['Max Temperature'] - weather_df[
+        weather_df['# Max Temp STDs'] = (weather_df['Max Temperature (C)'] - weather_df[
             'Max Temperature Calendar-Day Mean']) / weather_df['Max Temperature Calendar-Day STD']
-        weather_df['# Precipitation STDs'] = (weather_df['Precipitation (tenths of mm)'] - weather_df[
+        weather_df['# Precipitation STDs'] = (weather_df['Precipitation (mm)'] - weather_df[
             'Precipitation Calendar-Day Mean']) / weather_df['Precipitation Calendar-Day STD']
         weather_df['# Snow Depth STDs'] = (
         (weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df[
             'Snow Depth Calendar-Day STD']).fillna(0)
         weather_df['Mean # of Absolute STDs'] = abs(weather_df['# Max Temp STDs']) + abs(
             weather_df['# Precipitation STDs']) + abs(weather_df['# Snow Depth STDs'])
-        # Drop some of the columns
-        final_weather_df = weather_df[
-            ['Zip Code - 3 Digits', 'Date', 'Year', 'Month', 'Day', 'Max Temperature', 'Precipitation (tenths of mm)',
-             'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
-             'Mean # of Absolute STDs']]
-        # Merge ridership and weather data
-        MTA_weather_df = ridership_data.merge(final_weather_df, on=['Zip Code - 3 Digits', 'Date'])
+        # Merge to create final DF
+        MTA_weather_df = ridership_data.merge(weather_df, on=['Zip Code - 3 Digits', 'Date'])
+        # Drop & re-order some of the columns
         MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
-                                         'Max Temperature', 'Precipitation (tenths of mm)', 'Snow Depth (mm)',
+                                         'Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)',
                                          '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
                                          'Mean # of Absolute STDs']]
         # Insert into DB
@@ -212,4 +209,5 @@ else:
     MTA_weather_df.describe()
     MTA_weather_df.head()
     MTA_weather_df.to_csv('MTA_weather_df.csv')
-    MTA_weather_df['Year'].value_counts()
+    MTA_weather_df[''].value_counts()
+    MTA_weather_df['Max Temperature (C)'].describe()
