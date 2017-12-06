@@ -27,8 +27,19 @@ def get_ridership_data():
         ### Input code that creates this data set here ###
         ### Input code that creates this data set here ###.
         ### Input code that creates this data set here ###
+        ### Input code that creates this data set here ###
+        ### Input code that creates this data set here ###
+        ### Input code that creates this data set here ###.
+        ### Input code that creates this data set here ###
+
+        #Read and append the 2 CSVs
         ridership_data = pd.read_csv('Fixed.csv', index_col=False)
         ridership_data.columns = ['Date', 'Station', 'Entries', 'Exits', 'Zip Code']
+        ridership_data2 = pd.read_csv('2015Data.csv', index_col=False)
+        ridership_data2 = ridership_data2[['DATE', 'STATION', 'ENTRIES', 'EXITS', 'Zip Code']]
+        ridership_data2.columns = ['Date', 'Station', 'Entries', 'Exits', 'Zip Code']
+        ridership_data = ridership_data.append(ridership_data2, ignore_index=True)
+        #Munge data
         ridership_data['Date'] = pd.to_datetime(ridership_data['Date'])
         ridership_data['Zip Code'] = ridership_data['Zip Code'].astype(str)
         ridership_data['Zip Code'].replace('4064', '04064', inplace=True)
@@ -208,6 +219,5 @@ else:
     MTA_weather_df.info()
     MTA_weather_df.describe()
     MTA_weather_df.head()
-    MTA_weather_df.to_csv('MTA_weather_df.csv')
-    MTA_weather_df[''].value_counts()
+    #MTA_weather_df.to_csv('MTA_weather_df.csv')
     MTA_weather_df['Max Temperature (C)'].describe()
