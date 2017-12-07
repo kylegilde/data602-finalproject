@@ -8,10 +8,17 @@ import datetime as dt
 import numpy as np
 import pandas as pd
 from pymongo import MongoClient
-import time
 from pygeocoder import Geocoder
 import requests as req
 import math
+from sklearn import linear_model
+import statsmodels.api as sm
+import plotly
+import plotly.plotly as py
+import plotly.graph_objs as go
+import cufflinks as cf
+#import matplotlib.pyplot as plt
+#import time
 
 
 def get_ridership_data():
@@ -19,7 +26,7 @@ def get_ridership_data():
     try:
         #Attempt to load from MongoDB instance
         ridership_data = pd.DataFrame(list(db.ridership_data.find()))
-        ridership_data = ridership_data[['Date', 'Entries', 'Exits', 'Station', 'Zip Code', 'Zip Code - 3 Digits']]
+        ridership_data = ridership_data[['Date', 'Station', 'Zip Code', 'Zip Code - 3 Digits', 'Entries', 'Exits', 'Total Traffic']]
     except Exception as e:
         print(e, ': Getting new data')
         ### Initialize or recreate this data set. Write to MongoDB instance ###
@@ -40,6 +47,7 @@ def get_ridership_data():
         ridership_data2.columns = ['Date', 'Station', 'Entries', 'Exits', 'Zip Code']
         ridership_data = ridership_data.append(ridership_data2, ignore_index=True)
         #Munge data
+        ridership_data['Total Traffic'] = ridership_data['Entries'] + ridership_data['Exits']
         ridership_data['Date'] = pd.to_datetime(ridership_data['Date'])
         ridership_data['Zip Code'] = ridership_data['Zip Code'].astype(str)
         ridership_data['Zip Code'].replace('4064', '04064', inplace=True)
@@ -112,7 +120,16 @@ def create_MTA_weather_df(get_new_data=False):
         if get_new_data:
             a = 1 / 0
         MTA_weather_df = pd.DataFrame(list(db.MTA_weather_df.find()))
-        test = MTA_weather_df['Date']
+        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Year', 'Month', 'Day', 'Day of Week', 'Is Weekday',
+                                         'Entries', 'Exits', 'Total Traffic', 'Max Temperature (C)', 'Precipitation (mm)',
+                                         'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+                                         'Mean # of Absolute STDs']]
+        #Transform to categoricals
+        MTA_weather_df['Day'], MTA_weather_df['Month'], MTA_weather_df['Year'] = pd.Categorical(MTA_weather_df['Date'].dt.day, ordered=True), \
+                                                                    pd.Categorical(MTA_weather_df['Date'].dt.month, ordered=True), \
+                                                                    pd.Categorical(MTA_weather_df['Date'].dt.year, ordered=True)
+        MTA_weather_df['Day of Week'] = pd.Categorical(MTA_weather_df['Date'].dt.dayofweek + 1, ordered=True)
+        MTA_weather_df['Is Weekday'] = pd.Categorical((MTA_weather_df['Day of Week'] < 6).astype(int))
     except Exception as e:
         print(e, ': Getting new data')
 
@@ -147,7 +164,7 @@ def create_MTA_weather_df(get_new_data=False):
                     df_instance = pd.DataFrame(response_to_json['results'])
                     df_instance['Zip Code - 3 Digits'] = needed_weather_stations.loc[idx, 'Zip Code - 3 Digits']
                 except Exception as e:
-                    print(e)
+                    print('No results:', e)
                 else:
                     raw_weather = df_instance.append(raw_weather, ignore_index=True)
             start_date = end_date + dt.timedelta(1)
@@ -159,9 +176,12 @@ def create_MTA_weather_df(get_new_data=False):
                                     columns='datatype').dropna()
         weather_df = weather_df.reset_index()
         # Add, rename & transform columns
-        weather_df['Day'], weather_df['Month'], weather_df['Year'] = weather_df['Date'].dt.day, \
-                                                                     weather_df['Date'].dt.month, \
-                                                                     weather_df['Date'].dt.year
+        weather_df['Day'], weather_df['Month'], weather_df['Year'] = pd.Categorical(weather_df['Date'].dt.day, ordered=True), \
+                                                                    pd.Categorical(weather_df['Date'].dt.month, ordered=True), \
+                                                                    pd.Categorical(weather_df['Date'].dt.year, ordered=True)
+        weather_df['Day of Week'] = pd.Categorical(weather_df['Date'].dt.dayofweek + 1, ordered=True)
+        weather_df['Is Weekday'] = pd.Categorical((weather_df['Day of Week'] < 6).astype(int))
+
         # From tenths of degrees C to degrees C
         weather_df['Max Temperature (C)'] = weather_df['TMAX'] / 10
         # From tenths of mm to mm
@@ -195,9 +215,9 @@ def create_MTA_weather_df(get_new_data=False):
         # Merge to create final DF
         MTA_weather_df = ridership_data.merge(weather_df, on=['Zip Code - 3 Digits', 'Date'])
         # Drop & re-order some of the columns
-        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Entries', 'Exits', 'Year', 'Month', 'Day',
-                                         'Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)',
-                                         '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Year', 'Month', 'Day', 'Day of Week', 'Is Weekday',
+                                         'Entries', 'Exits', 'Total Traffic', 'Max Temperature (C)', 'Precipitation (mm)',
+                                         'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
                                          'Mean # of Absolute STDs']]
         # Insert into DB
         try:
@@ -218,6 +238,48 @@ else:
     MTA_weather_df = create_MTA_weather_df()
     MTA_weather_df.info()
     MTA_weather_df.describe()
-    MTA_weather_df.head()
-    #MTA_weather_df.to_csv('MTA_weather_df.csv')
-    MTA_weather_df['Max Temperature (C)'].describe()
+###Mike's CODE
+
+    ##statsmodels
+    X = MTA_weather_df['Entries']
+    y = MTA_weather_df['Exits']
+    # Note the difference in argument order
+    model = sm.OLS(y, X).fit()
+    predictions = model.predict(X) # make the predictions by the model
+
+    # Print out the statistics
+    model.summary()
+
+    ## SK Learn
+    explanatory = MTA_weather_df[['# Max Temp STDs','Month','Year','Precipitation (mm)']]
+    target = pd.DataFrame(MTA_weather_df['Total Traffic'])
+    sklm = linear_model.LinearRegression()
+    skmodel = sklm.fit(explanatory, target)
+
+    predictions = sklm.predict(explanatory)
+    print(predictions)
+
+
+
+### NKasi's CODE
+    plotly.offline.init_notebook_mode(connected=True)
+    cf.go_offline()
+    all_data = pd.DataFrame(list(db.MTA_weather_df.find()))
+    # print(all_data.head())
+    # Separate dataset into those days with precipitation and those without
+    with_precip_snow = all_data[(all_data['Precipitation (mm)'] > 0) | (all_data['Snow Depth (mm)'] > 0)]
+    with_mean_entries = np.mean(with_precip_snow['Entries'])
+    without_precip_snow = all_data[(all_data['Precipitation (mm)'] == 0) | (all_data['Snow Depth (mm)'] == 0)]
+    without_mean_entries = np.mean(without_precip_snow['Entries'])
+
+    with_precip = with_precip_snow.groupby('Month')['Entries'].mean()
+    without_precip = without_precip_snow.groupby('Month')['Entries'].mean()
+
+    all_precip = pd.DataFrame()
+    all_precip['With Precipitation or Snow'] = with_precip
+    all_precip['Without Precipitation or Snow'] = without_precip
+    # print(all_data.info())
+
+    all_precip.iplot(kind='barh', barmode="grouped", bargap=.5,
+                     title="Average Entries to Subway stations by Month, with and without precipitation",
+                     xTitle="Month", yTitle="Number of Entries", filename='cufflinks/grouped-bar-chart')
