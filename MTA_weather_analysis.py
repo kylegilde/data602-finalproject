@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env/python3
 """
 Created on Mon Nov 20 14:17:39 2017
-
-@author: kyleg
+CUNY DATA602 Final Project
+@author: Nkasi Nedd, Michael Muller & Kyle Gilde
 """
 import datetime as dt
 import numpy as np
@@ -13,6 +13,7 @@ import requests as req
 import math
 from sklearn import linear_model
 import statsmodels.api as sm
+from sklearn.model_selection import train_test_split
 import plotly
 import plotly.plotly as py
 import plotly.graph_objs as go
@@ -22,7 +23,7 @@ import cufflinks as cf
 
 
 def get_ridership_data():
-    # Loads or creates the ridership data by day, station and zip code #
+    """Loads or creates the ridership data by day, station and zip code"""
     try:
         #Attempt to load from MongoDB instance
         ridership_data = pd.DataFrame(list(db.ridership_data.find()))
@@ -63,7 +64,7 @@ def get_ridership_data():
 
 
 def reverse_geocode_zip_codes(NY_weather_stations):
-    ### Gets Zip Code and City for the weather stations ###
+    """Gets Zip Code and City for the weather stations"""
     NY_weather_stations = NY_weather_stations.set_index('Station ID')
     remaining_stations = NY_weather_stations[pd.isnull(NY_weather_stations['Zip Code'])]
     if len(remaining_stations) > 0:
@@ -80,7 +81,7 @@ def reverse_geocode_zip_codes(NY_weather_stations):
 
 
 def get_weather_station_metadata(get_new_data=False):
-    ### Get NY Weather Station Metadata ###
+    """Get NY Weather Station Metadata"""
     try:
         if get_new_data:
             a = 1 / 0
@@ -115,7 +116,7 @@ def get_weather_station_metadata(get_new_data=False):
 
 
 def create_MTA_weather_df(get_new_data=False):
-    ### Pulls weather data from API and combines with MTA ridership data ###
+    """" Pulls weather data from API and combines with MTA ridership data """
     try:
         if get_new_data:
             a = 1 / 0
@@ -125,11 +126,13 @@ def create_MTA_weather_df(get_new_data=False):
                                          'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
                                          'Mean # of Absolute STDs']]
         #Transform to categoricals
-        MTA_weather_df['Day'], MTA_weather_df['Month'], MTA_weather_df['Year'] = pd.Categorical(MTA_weather_df['Date'].dt.day, ordered=True), \
-                                                                    pd.Categorical(MTA_weather_df['Date'].dt.month, ordered=True), \
-                                                                    pd.Categorical(MTA_weather_df['Date'].dt.year, ordered=True)
-        MTA_weather_df['Day of Week'] = pd.Categorical(MTA_weather_df['Date'].dt.dayofweek + 1, ordered=True)
-        MTA_weather_df['Is Weekday'] = pd.Categorical((MTA_weather_df['Day of Week'] < 6).astype(int))
+        MTA_weather_df['Day'], MTA_weather_df['Month'], MTA_weather_df['Year'], MTA_weather_df['Day of Week'], MTA_weather_df['Is Weekday'] = \
+                                                                    pd.Categorical(MTA_weather_df['Day'], ordered=True), \
+                                                                    pd.Categorical(MTA_weather_df['Month'], ordered=True), \
+                                                                    pd.Categorical(MTA_weather_df['Year'], ordered=True), \
+                                                                    pd.Categorical(MTA_weather_df['Day of Week'], ordered=True),\
+                                                                    pd.Categorical(MTA_weather_df['Is Weekday'], ordered=True)
+
     except Exception as e:
         print(e, ': Getting new data')
 
@@ -238,11 +241,40 @@ else:
     MTA_weather_df = create_MTA_weather_df()
     MTA_weather_df.info()
     MTA_weather_df.describe()
+    MTA_weather_df['Station'].value_counts()
+#'Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)'
+
+    import statsmodels.formula.api as smf
+    X = MTA_weather_df[['Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)']]
+    y = MTA_weather_df[['Total Traffic']]
+    X.info()
+    X.columns = ['Month', 'Is_Weekday','Max_Temperature_C', 'Precipitation_mm', 'Snow_Depth_mm']
+    y.columns = ['Total_Traffic']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
+    df_train = pd.concat([X_train, y_train], axis=1)
+
+    #  These variables weren't statistically significant + C(Month)+ Snow_Depth_mm
+    #sm_model = sm.OLS(y, X).fit()
+    sm_model = smf.ols(formula="Total_Traffic ~ Max_Temperature_C + Precipitation_mm + C(Is_Weekday)", data=df_train).fit()
+    sm_model.summary()
+    predictions = sm_model.predict(X_test) # make the predictions by the model
+    from matplotlib import pyplot as plt
+    plt.scatter(y_test, predictions)
+    plt.xlabel('True Values')
+    plt.ylabel('Predictions')
+
+
+
+
+
+
+
+
 ###Mike's CODE
 
     ##statsmodels
     X = MTA_weather_df['Entries']
-    y = MTA_weather_df['Exits']
+    y = MTA_weather_df['Max Temperature (C)']
     # Note the difference in argument order
     model = sm.OLS(y, X).fit()
     predictions = model.predict(X) # make the predictions by the model
@@ -255,7 +287,7 @@ else:
     target = pd.DataFrame(MTA_weather_df['Total Traffic'])
     sklm = linear_model.LinearRegression()
     skmodel = sklm.fit(explanatory, target)
-
+    skmodel
     predictions = sklm.predict(explanatory)
     print(predictions)
 
