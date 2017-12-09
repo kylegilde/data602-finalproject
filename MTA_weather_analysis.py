@@ -18,9 +18,8 @@ import plotly
 import plotly.plotly as py
 import plotly.graph_objs as go
 import cufflinks as cf
-#import matplotlib.pyplot as plt
-#import time
-
+import statsmodels.formula.api as smf
+from matplotlib import pyplot as plt
 
 def get_ridership_data():
     """Loads or creates the ridership data by day, station and zip code"""
@@ -33,11 +32,11 @@ def get_ridership_data():
         ### Initialize or recreate this data set. Write to MongoDB instance ###
         ### Input code that creates this data set here ###
         ### Input code that creates this data set here ###
-        ### Input code that creates this data set here ###.
         ### Input code that creates this data set here ###
         ### Input code that creates this data set here ###
         ### Input code that creates this data set here ###
-        ### Input code that creates this data set here ###.
+        ### Input code that creates this data set here ###
+        ### Input code that creates this data set here ###
         ### Input code that creates this data set here ###
 
         #Read and append the 2 CSVs
@@ -243,7 +242,6 @@ else:
     MTA_weather_df.describe()
     MTA_weather_df['Station'].value_counts()
 
-    import statsmodels.formula.api as smf
     X = MTA_weather_df[['Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)']]
     y = MTA_weather_df[['Total Traffic']]
     X.columns = ['Month', 'Is_Weekday','Max_Temperature_C', 'Precipitation_mm', 'Snow_Depth_mm']
@@ -251,8 +249,7 @@ else:
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
     df_train = pd.concat([X_train, y_train], axis=1)
 
-    #  These variables weren't statistically significant: + y_intercept
-    #sm_model = sm.OLS(y, X).fit() + + Snow_Depth_mm
+    #  These variables weren't statistically significant: Snow_Depth_mm +  C(Month)
     #sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + C(Month)", data=df_train).fit()
     sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + Max_Temperature_C", data=df_train).fit()
     sm_model.summary()
@@ -260,60 +257,6 @@ else:
     predictions = sm_model.predict(X_test) # make the predictions by the model
     RMSE = np.sqrt(np.sum((predictions - y_test['Total_Traffic'])**2) / len(y_test))
 
-    from matplotlib import pyplot as plt
     plt.scatter(y_test, predictions)
     plt.xlabel('True Values')
     plt.ylabel('Predictions')
-
-
-
-
-
-
-
-
-###Mike's CODE
-
-    ##statsmodels
-    X = MTA_weather_df['Entries']
-    y = MTA_weather_df['Max Temperature (C)']
-    # Note the difference in argument order
-    model = sm.OLS(y, X).fit()
-    predictions = model.predict(X) # make the predictions by the model
-
-    # Print out the statistics
-    model.summary()
-
-    ## SK Learn
-    explanatory = MTA_weather_df[['# Max Temp STDs','Month','Year','Precipitation (mm)']]
-    target = pd.DataFrame(MTA_weather_df['Total Traffic'])
-    sklm = linear_model.LinearRegression()
-    skmodel = sklm.fit(explanatory, target)
-    skmodel
-    predictions = sklm.predict(explanatory)
-    print(predictions)
-
-
-
-### NKasi's CODE
-    plotly.offline.init_notebook_mode(connected=True)
-    cf.go_offline()
-    all_data = pd.DataFrame(list(db.MTA_weather_df.find()))
-    # print(all_data.head())
-    # Separate dataset into those days with precipitation and those without
-    with_precip_snow = all_data[(all_data['Precipitation (mm)'] > 0) | (all_data['Snow Depth (mm)'] > 0)]
-    with_mean_entries = np.mean(with_precip_snow['Entries'])
-    without_precip_snow = all_data[(all_data['Precipitation (mm)'] == 0) | (all_data['Snow Depth (mm)'] == 0)]
-    without_mean_entries = np.mean(without_precip_snow['Entries'])
-
-    with_precip = with_precip_snow.groupby('Month')['Entries'].mean()
-    without_precip = without_precip_snow.groupby('Month')['Entries'].mean()
-
-    all_precip = pd.DataFrame()
-    all_precip['With Precipitation or Snow'] = with_precip
-    all_precip['Without Precipitation or Snow'] = without_precip
-    # print(all_data.info())
-
-    all_precip.iplot(kind='barh', barmode="grouped", bargap=.5,
-                     title="Average Entries to Subway stations by Month, with and without precipitation",
-                     xTitle="Month", yTitle="Number of Entries", filename='cufflinks/grouped-bar-chart')
