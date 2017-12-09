@@ -242,22 +242,24 @@ else:
     MTA_weather_df.info()
     MTA_weather_df.describe()
     MTA_weather_df['Station'].value_counts()
-#'Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)'
 
     import statsmodels.formula.api as smf
     X = MTA_weather_df[['Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)']]
     y = MTA_weather_df[['Total Traffic']]
-    X.info()
     X.columns = ['Month', 'Is_Weekday','Max_Temperature_C', 'Precipitation_mm', 'Snow_Depth_mm']
     y.columns = ['Total_Traffic']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
     df_train = pd.concat([X_train, y_train], axis=1)
 
-    #  These variables weren't statistically significant + C(Month)+ Snow_Depth_mm
-    #sm_model = sm.OLS(y, X).fit()
-    sm_model = smf.ols(formula="Total_Traffic ~ Max_Temperature_C + Precipitation_mm + C(Is_Weekday)", data=df_train).fit()
+    #  These variables weren't statistically significant: + y_intercept
+    #sm_model = sm.OLS(y, X).fit() + + Snow_Depth_mm
+    #sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + C(Month)", data=df_train).fit()
+    sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + Max_Temperature_C", data=df_train).fit()
     sm_model.summary()
+
     predictions = sm_model.predict(X_test) # make the predictions by the model
+    RMSE = np.sqrt(np.sum((predictions - y_test['Total_Traffic'])**2) / len(y_test))
+
     from matplotlib import pyplot as plt
     plt.scatter(y_test, predictions)
     plt.xlabel('True Values')
