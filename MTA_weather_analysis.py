@@ -241,6 +241,71 @@ else:
     MTA_weather_df.info()
     MTA_weather_df.describe()
     MTA_weather_df['Station'].value_counts()
+    
+    #Exploring
+    
+    #Average traffic by month
+
+    entries_by_month = MTA_weather_df.groupby('Month')['Total Traffic'].mean()
+
+    entries_month_plot = entries_by_month.plot(kind='bar', legend = None, title = 'Average Subway Traffic by Month')
+
+    entries_month_plot.set_xlabel("Month")
+    entries_month_plot.set_ylabel("Average Traffic")
+
+    #Average traffic by day of week
+    entries_by_week = MTA_weather_df.groupby('Day of Week')['Total Traffic'].mean()
+
+    entries_week_plot = entries_by_week.plot(kind='bar', legend = None, title = 'Average Subway Traffic by Day of Week')
+
+    entries_week_plot.set_xlabel("Day of Week")
+    entries_week_plot.set_ylabel("Average Traffic")
+    #entries_week_plot.xticks("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    
+    #Average entries at stations
+    entries_by_station = MTA_weather_df.groupby('Station')['Total Traffic'].mean()
+
+    entries_station_plot = entries_by_station.plot(kind='bar', legend = None, title = 'Average Subway Traffic by Station')
+
+    entries_station_plot.set_xlabel("Station")
+    entries_station_plot.set_ylabel("Average Traffic")
+    
+    #Average Precipitation (mm) by station
+
+    precip_by_station = MTA_weather_df.groupby('Station')['Precipitation (mm)'].mean()
+
+    precip_station_plot = precip_by_station.plot(kind='bar', legend = None, title = 'Average Precipitation (mm) by Station')
+
+    precip_station_plot.set_xlabel("Station")
+    precip_station_plot.set_ylabel("Average Precipitation (mm)")
+    
+    
+    #Average Snow Depth (m) by station
+
+    snow_by_station = MTA_weather_df.groupby('Station')['Snow Depth (mm)'].mean()
+
+    snow_station_plot = snow_by_station.plot(kind='bar', legend = None, title = 'Average Snow Depth (mm) by Station')
+
+    snow_station_plot.set_xlabel("Station")
+    snow_station_plot.set_ylabel("Average Snow Depth (mm)")
+    
+    
+    #Separate dataset into those days with precipitation and those without
+    with_precip_snow = MTA_weather_df[(MTA_weather_df['Precipitation (mm)'] > 0) | (MTA_weather_df['Snow Depth (mm)'] > 0)]
+    with_mean_traffic = np.mean(with_precip_snow['Total Traffic'])
+    without_precip_snow = MTA_weather_df[(MTA_weather_df['Precipitation (mm)'] == 0) | (MTA_weather_df['Snow Depth (mm)'] == 0)]
+    without_mean_traffic = np.mean(without_precip_snow['Total Traffic'])
+    
+    with_precip = with_precip_snow.groupby('Month')['Total Traffic'].mean()
+    without_precip = without_precip_snow.groupby('Month')['Total Traffic'].mean()
+    
+    
+    
+    all_precip = pd.DataFrame()
+    all_precip['With Precipitation or Snow'] = with_precip
+    all_precip['Without Precipitation or Snow'] = without_precip
+    all_precip.plot.bar(title = 'Average total traffic with and without snow/precipitation by month ')
+    
 
     X = MTA_weather_df[['Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)']]
     y = MTA_weather_df[['Total Traffic']]
