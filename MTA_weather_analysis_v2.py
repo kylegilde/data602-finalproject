@@ -1,4 +1,4 @@
-#!/usr/bin/env/python3
+# !/usr/bin/env/python3
 """
 Created on Mon Nov 20 14:17:39 2017
 CUNY DATA602 Final Project
@@ -13,97 +13,100 @@ from pymongo import MongoClient
 from pygeocoder import Geocoder
 import requests as req
 import math
+#stats packages
 from sklearn import linear_model
 import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from sklearn.model_selection import train_test_split
+
 import plotly
 import plotly.plotly as py
 import plotly.graph_objs as go
 import cufflinks as cf
-import statsmodels.formula.api as smf
+
 from matplotlib import pyplot as plt
+import random
 
 def get_ridership_data():
     """Loads or creates the ridership data by day, station and zip code"""
     try:
-        #Attempt to load from MongoDB instance
+        # Attempt to load from MongoDB instance
         ridership_data = pd.DataFrame(list(db.ridership_data.find()))
-        ridership_data = ridership_data[['Date', 'Station', 'Zip Code', 'Zip Code - 3 Digits', 'Entries', 'Exits', 'Total Traffic']]
+        ridership_data = ridership_data[['Date', 'Station', 'Zip Code', 'Zip Code - 3 Digits', 'Entries', 'Exits',
+                                         'Total Traffic']]
     except Exception as e:
         print(e, ': Getting new data')
-        date = dt.datetime(2015,1,10)
+        date = dt.datetime(2015, 1, 10)
         cwd = os.getcwd()
-        #datetime.timedelta(days=1)
+        # datetime.timedelta(days=1)
         url = 'http://web.mta.info/developers/data/nyct/turnstile/turnstile_'
-
 
         for attempt in range(99999):
             try:
-                fileID = date.isoformat()[2:4]+date.isoformat()[5:7]+date.isoformat()[8:10]
-                link = url+fileID+'.txt'
-                urllib.request.urlretrieve(link,'./turnstileData/turnstile_'+fileID+'.csv')
+                fileID = date.isoformat()[2:4] + date.isoformat()[5:7] + date.isoformat()[8:10]
+                link = url + fileID + '.txt'
+                urllib.request.urlretrieve(link, './turnstileData/turnstile_' + fileID + '.csv')
                 date = date + dt.timedelta(weeks=1)
-                print('Downloaded ' +str(fileID))
+                print('Downloaded ' + str(fileID))
             except Exception as e:
                 print(e)
                 print(link)
                 break
-        files = os.listdir(cwd+'/turnstileData')
-        masterDF = pd.DataFrame(columns=['DATE','STATION','ENTRIES','EXITS'])
+        files = os.listdir(cwd + '/turnstileData')
+        masterDF = pd.DataFrame(columns=['DATE', 'STATION', 'ENTRIES', 'EXITS'])
         for dataFile in files[1:]:
-            currentWeek = pd.read_csv(cwd+'/turnstileData/'+dataFile,names=['C/A', 'UNIT', 'SCP', 'STATION', 'LINENAME', 'DIVISION', 'DATE', 'TIME',
-                                                                        'DESC', 'ENTRIES', 'EXITS'])
+            currentWeek = pd.read_csv(cwd + '/turnstileData/' + dataFile,
+                                      names=['C/A', 'UNIT', 'SCP', 'STATION', 'LINENAME', 'DIVISION', 'DATE', 'TIME',
+                                             'DESC', 'ENTRIES', 'EXITS'])
         datesInFile = currentWeek['DATE'].unique()
-        stationsInFileToUse = currentWeek.loc[currentWeek['LINENAME'].isin(['2','3','4','5','6'])]
-        #uniqueStations = list(stationsInFileToUse['STATION'].unique())
+        stationsInFileToUse = currentWeek.loc[currentWeek['LINENAME'].isin(['2', '3', '4', '5', '6'])]
+        # uniqueStations = list(stationsInFileToUse['STATION'].unique())
         print('All Dates in file are ')
         print(datesInFile)
-            for dates in datesInFile[1:]:
-                print(dates)
-                narrowFrame  = stationsInFileToUse.loc[stationsInFileToUse['DATE']==dates]
-                    for station in stationsInFileToUse['STATION'].unique():
-                    narrowFrame2 = narrowFrame.loc[narrowFrame['STATION']==station]
-                    stationEntries = []
-                    stationExits = []
-                        for scp in narrowFrame2['SCP'].unique():
-                            narrowerFrame = narrowFrame2.loc[narrowFrame2['SCP']==scp]
-                            entries =narrowerFrame['ENTRIES'].max() - narrowerFrame['ENTRIES'].min()
-                            exits = narrowerFrame['EXITS'].max() - narrowerFrame['EXITS'].min()
-                            stationEntries.append(entries)
-                            stationExits.append(exits)
-                        stationEntries = pd.Series(stationEntries).sum()
-                        stationExits = pd.Series(stationExits).sum()
-                        row = pd.Series({'DATE':dates,'STATION':station,'ENTRIES':stationEntries,'EXITS':stationExits})
-                        masterDF = masterDF.append(row,ignore_index=True)
+        for dates in datesInFile[1:]:
+            print(dates)
+            narrowFrame = stationsInFileToUse.loc[stationsInFileToUse['DATE'] == dates]
+            for station in stationsInFileToUse['STATION'].unique():
+                narrowFrame2 = narrowFrame.loc[narrowFrame['STATION'] == station]
+            stationEntries = []
+            stationExits = []
+            for scp in narrowFrame2['SCP'].unique():
+                narrowerFrame = narrowFrame2.loc[narrowFrame2['SCP'] == scp]
+                entries = narrowerFrame['ENTRIES'].max() - narrowerFrame['ENTRIES'].min()
+                exits = narrowerFrame['EXITS'].max() - narrowerFrame['EXITS'].min()
+                stationEntries.append(entries)
+                stationExits.append(exits)
+            stationEntries = pd.Series(stationEntries).sum()
+            stationExits = pd.Series(stationExits).sum()
+            row = pd.Series({'DATE': dates, 'STATION': station, 'ENTRIES': stationEntries, 'EXITS': stationExits})
+            masterDF = masterDF.append(row, ignore_index=True)
+
         masterDF.to_csv('preliminary.csv')
-        mix = pd.read_csv('zipcodes.csv',names=['STATION','Zip Code'],header=0)
+        mix = pd.read_csv('zipcodes.csv', names=['STATION', 'Zip Code'], header=0)
 
+        masterDF = pd.read_csv('preliminary.csv').drop(['Unnamed: 0'], axis=1)
 
-
-        masterDF = pd.read_csv('preliminary.csv').drop(['Unnamed: 0'],axis=1)
-
-
-        masterDF['STATION'].loc[masterDF['STATION']=='148 ST-LENOX'] = 'HARLEM 148 ST'
-        masterDF['STATION'].loc[masterDF['STATION']=='138 ST-3 AVE'] = '3 AV 138 ST' 
-        masterDF['STATION'].loc[masterDF['STATION']=='E 143 ST'] = 'E 143/ST MARY\'S'
-        masterDF['STATION'].loc[masterDF['STATION']=='E 177 ST-PARKCH'] = 'PARKCHESTER'
-        masterDF['STATION'].loc[masterDF['STATION']=='DYRE AVE'] = 'EASTCHSTER/DYRE'
+        masterDF['STATION'].loc[masterDF['STATION'] == '148 ST-LENOX'] = 'HARLEM 148 ST'
+        masterDF['STATION'].loc[masterDF['STATION'] == '138 ST-3 AVE'] = '3 AV 138 ST'
+        masterDF['STATION'].loc[masterDF['STATION'] == 'E 143 ST'] = 'E 143/ST MARY\'S'
+        masterDF['STATION'].loc[masterDF['STATION'] == 'E 177 ST-PARKCH'] = 'PARKCHESTER'
+        masterDF['STATION'].loc[masterDF['STATION'] == 'DYRE AVE'] = 'EASTCHSTER/DYRE'
 
         differentNames = list(masterDF['STATION'].unique())
 
         for name in differentNames:
             print(name)
-            mix['similarity'] = mix['STATION'].apply(lambda x: SequenceMatcher(None,name,x).ratio())
-            consistentName = list(mix['STATION'].loc[mix['similarity'].max()==mix['similarity']])[0]
-            masterDF['STATION'].loc[masterDF['STATION']==name] = consistentName
-            #print(list(mix['STATION'].loc[mix['similarity'].max()==mix['similarity']]))
+            mix['similarity'] = mix['STATION'].apply(lambda x: SequenceMatcher(None, name, x).ratio())
+            consistentName = list(mix['STATION'].loc[mix['similarity'].max() == mix['similarity']])[0]
+            masterDF['STATION'].loc[masterDF['STATION'] == name] = consistentName
+        # print(list(mix['STATION'].loc[mix['similarity'].max()==mix['similarity']]))
 
         mix = mix.set_index('STATION')['Zip Code'].to_dict()
         masterDF['Zip Code'] = masterDF['STATION'].map(mix)
-        masterDF.to_csv('Fixed.csv',index=False)
-### End of turnstile acquisition and tidy :: All info in 'Fixed.csv'
-#####################################################################################################################################
-        #Read and append the 2 CSVs
+        masterDF.to_csv('Fixed.csv', index=False)
+        ### End of turnstile acquisition and tidy :: All info in 'Fixed.csv'
+        ###############################################################################################################
+        # Read and append the 2 CSVs
         ridership_data = pd.read_csv('Fixed.csv', index_col=False)
         ridership_data.columns = ['Date', 'Station', 'Entries', 'Exits', 'Zip Code']
         ridership_data2 = pd.read_csv('2015Data.csv', index_col=False)
@@ -124,7 +127,6 @@ def get_ridership_data():
         except Exception as e:
             print(e)
     return ridership_data
-
 
 def reverse_geocode_zip_codes(NY_weather_stations):
     """Gets Zip Code and City for the weather stations"""
@@ -148,7 +150,7 @@ def get_weather_station_metadata(get_new_data=False):
     try:
         if get_new_data:
             a = 1 / 0
-        #Attempt to load from MongoDB instance
+        # Attempt to load from MongoDB instance
         NY_weather_stations = pd.DataFrame(list(db.dim_station.find()))
         test = NY_weather_stations['Station ID']
     except Exception as e:
@@ -184,17 +186,19 @@ def create_MTA_weather_df(get_new_data=False):
         if get_new_data:
             a = 1 / 0
         MTA_weather_df = pd.DataFrame(list(db.MTA_weather_df.find()))
-        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Year', 'Month', 'Day', 'Day of Week', 'Is Weekday',
-                                         'Entries', 'Exits', 'Total Traffic', 'Max Temperature (C)', 'Precipitation (mm)',
-                                         'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
-                                         'Mean # of Absolute STDs']]
-        #Transform to categoricals
-        MTA_weather_df['Day'], MTA_weather_df['Month'], MTA_weather_df['Year'], MTA_weather_df['Day of Week'], MTA_weather_df['Is Weekday'] = \
-                                                                    pd.Categorical(MTA_weather_df['Day'], ordered=True), \
-                                                                    pd.Categorical(MTA_weather_df['Month'], ordered=True), \
-                                                                    pd.Categorical(MTA_weather_df['Year'], ordered=True), \
-                                                                    pd.Categorical(MTA_weather_df['Day of Week'], ordered=True),\
-                                                                    pd.Categorical(MTA_weather_df['Is Weekday'], ordered=True)
+        MTA_weather_df = MTA_weather_df[
+            ['Date', 'Station', 'Zip Code', 'Year', 'Month', 'Day', 'Day of Week', 'Is Weekday',
+             'Entries', 'Exits', 'Total Traffic', 'Max Temperature (C)', 'Precipitation (mm)',
+             'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+             'Mean # of Absolute STDs']]
+        # Transform to categoricals
+        MTA_weather_df['Day'], MTA_weather_df['Month'], MTA_weather_df['Year'], MTA_weather_df['Day of Week'], \
+        MTA_weather_df['Is Weekday'] = \
+            pd.Categorical(MTA_weather_df['Day'], ordered=True), \
+            pd.Categorical(MTA_weather_df['Month'], ordered=True), \
+            pd.Categorical(MTA_weather_df['Year'], ordered=True), \
+            pd.Categorical(MTA_weather_df['Day of Week'], ordered=True), \
+            pd.Categorical(MTA_weather_df['Is Weekday'], ordered=True)
 
     except Exception as e:
         print(e, ': Getting new data')
@@ -222,8 +226,8 @@ def create_MTA_weather_df(get_new_data=False):
             for idx in needed_weather_stations.index.tolist():
                 try:
                     parameters = (
-                    *variables, needed_weather_stations.loc[idx, "Station ID"], str_start_date, str_end_date,
-                    api_limit_per_call)
+                        *variables, needed_weather_stations.loc[idx, "Station ID"], str_start_date, str_end_date,
+                        api_limit_per_call)
                     api_call = api_url % parameters
                     get_response = req.get(api_call, headers=headers)
                     response_to_json = get_response.json()
@@ -242,9 +246,12 @@ def create_MTA_weather_df(get_new_data=False):
                                     columns='datatype').dropna()
         weather_df = weather_df.reset_index()
         # Add, rename & transform columns
-        weather_df['Day'], weather_df['Month'], weather_df['Year'] = pd.Categorical(weather_df['Date'].dt.day, ordered=True), \
-                                                                    pd.Categorical(weather_df['Date'].dt.month, ordered=True), \
-                                                                    pd.Categorical(weather_df['Date'].dt.year, ordered=True)
+        weather_df['Day'], weather_df['Month'], weather_df['Year'] = pd.Categorical(weather_df['Date'].dt.day,
+                                                                                    ordered=True), \
+                                                                     pd.Categorical(weather_df['Date'].dt.month,
+                                                                                    ordered=True), \
+                                                                     pd.Categorical(weather_df['Date'].dt.year,
+                                                                                    ordered=True)
         weather_df['Day of Week'] = pd.Categorical(weather_df['Date'].dt.dayofweek + 1, ordered=True)
         weather_df['Is Weekday'] = pd.Categorical((weather_df['Day of Week'] < 6).astype(int))
 
@@ -274,17 +281,18 @@ def create_MTA_weather_df(get_new_data=False):
         weather_df['# Precipitation STDs'] = (weather_df['Precipitation (mm)'] - weather_df[
             'Precipitation Calendar-Day Mean']) / weather_df['Precipitation Calendar-Day STD']
         weather_df['# Snow Depth STDs'] = (
-        (weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df[
-            'Snow Depth Calendar-Day STD']).fillna(0)
+            (weather_df['Snow Depth (mm)'] - weather_df['Snow Depth Calendar-Day Mean']) / weather_df[
+                'Snow Depth Calendar-Day STD']).fillna(0)
         weather_df['Mean # of Absolute STDs'] = abs(weather_df['# Max Temp STDs']) + abs(
             weather_df['# Precipitation STDs']) + abs(weather_df['# Snow Depth STDs'])
         # Merge to create final DF
         MTA_weather_df = ridership_data.merge(weather_df, on=['Zip Code - 3 Digits', 'Date'])
         # Drop & re-order some of the columns
-        MTA_weather_df = MTA_weather_df[['Date', 'Station', 'Zip Code', 'Year', 'Month', 'Day', 'Day of Week', 'Is Weekday',
-                                         'Entries', 'Exits', 'Total Traffic', 'Max Temperature (C)', 'Precipitation (mm)',
-                                         'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
-                                         'Mean # of Absolute STDs']]
+        MTA_weather_df = MTA_weather_df[
+            ['Date', 'Station', 'Zip Code', 'Year', 'Month', 'Day', 'Day of Week', 'Is Weekday',
+             'Entries', 'Exits', 'Total Traffic', 'Max Temperature (C)', 'Precipitation (mm)',
+             'Snow Depth (mm)', '# Max Temp STDs', '# Precipitation STDs', '# Snow Depth STDs',
+             'Mean # of Absolute STDs']]
         # Insert into DB
         try:
             db.MTA_weather_df.drop()
@@ -303,23 +311,20 @@ except Exception as e:
 else:
     MTA_weather_df = create_MTA_weather_df()
     MTA_weather_df.info()
-    MTA_weather_df.describe()
-    MTA_weather_df['Station'].value_counts()
-
-    X = MTA_weather_df[['Month', 'Is Weekday','Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)']]
+    random.seed(888)
+    X = MTA_weather_df[['Month', 'Is Weekday', 'Max Temperature (C)', 'Precipitation (mm)', 'Snow Depth (mm)']]
     y = MTA_weather_df[['Total Traffic']]
-    X.columns = ['Month', 'Is_Weekday','Max_Temperature_C', 'Precipitation_mm', 'Snow_Depth_mm']
+    X.columns = ['Month', 'Is_Weekday', 'Max_Temperature_C', 'Precipitation_mm', 'Snow_Depth_mm']
     y.columns = ['Total_Traffic']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
     df_train = pd.concat([X_train, y_train], axis=1)
-
-    #  These variables weren't statistically significant: Snow_Depth_mm +  C(Month)
-    #sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + C(Month)", data=df_train).fit()
-    sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + Max_Temperature_C", data=df_train).fit()
+#  These variables weren't statistically significant: Snow_Depth_mm +  C(Month)
+    sm_model = smf.ols(formula="Total_Traffic ~ Precipitation_mm + C(Is_Weekday)  + Max_Temperature_C",
+                       data=df_train).fit()
     sm_model.summary()
-
-    predictions = sm_model.predict(X_test) # make the predictions by the model
-    RMSE = np.sqrt(np.sum((predictions - y_test['Total_Traffic'])**2) / len(y_test))
+    predictions = sm_model.predict(X_test)  # make the predictions by the model
+    RMSE = np.sqrt(np.sum((predictions - y_test['Total_Traffic']) ** 2) / len(y_test))
+    print('Root Mean Squared Error:', RMSE)
 
     plt.scatter(y_test, predictions)
     plt.xlabel('True Values')
