@@ -50,8 +50,8 @@ def get_ridership_data():
                 break
         files = os.listdir(cwd+'/turnstileData')
         masterDF = pd.DataFrame(columns=['DATE','STATION','ENTRIES','EXITS'])
-        for dataFile in files:
-        currentWeek = pd.read_csv(cwd+'/turnstileData/'+dataFile,names=['C/A', 'UNIT', 'SCP', 'STATION', 'LINENAME', 'DIVISION', 'DATE', 'TIME',
+        for dataFile in files[1:]:
+            currentWeek = pd.read_csv(cwd+'/turnstileData/'+dataFile,names=['C/A', 'UNIT', 'SCP', 'STATION', 'LINENAME', 'DIVISION', 'DATE', 'TIME',
                                                                         'DESC', 'ENTRIES', 'EXITS'])
         datesInFile = currentWeek['DATE'].unique()
         stationsInFileToUse = currentWeek.loc[currentWeek['LINENAME'].isin(['2','3','4','5','6'])]
