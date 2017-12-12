@@ -27,7 +27,7 @@ The project can be accessed in the following ways:
 
 1.  Via hosted environment on EC2 - http://54.84.167.234:80
 
-The password to be used is: 3525113c943c470643c92905d81d3fcbae8b309e0d52d3e9
+The password to be used is: c8478379cb0e490106f96c5ed8743870492db283045313ac
 
 2.  Via Docker image found here: https://hub.docker.com/r/parastyle/finalbook/
 
